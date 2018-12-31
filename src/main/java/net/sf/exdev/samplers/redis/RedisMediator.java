@@ -16,7 +16,7 @@ import redis.clients.jedis.Jedis;
 
 public class RedisMediator {
 
-	private Jedis client = null;
+	private volatile Jedis client = null;
 	private static final Logger LOG = LoggerFactory.getLogger(RedisMediator.class);
 
 	public RedisMediator(String host, int port) {
@@ -69,42 +69,35 @@ public class RedisMediator {
 
 		for (String line : lines) {
 			String[] command = line.trim().split("  ");
-			try {
-				switch (command[0].toLowerCase()) {
-				case "append":
-					append(command[1], command[2]);
-					break;
+			switch (command[0].toLowerCase()) {
+			case "append":
+				append(command[1], command[2]);
+				break;
 
-				case "set":
-					set(command[1], command[2]);
-					break;
+			case "set":
+				set(command[1], command[2]);
+				break;
 
-				case "get":
-					get(command[1]);
-					break;
+			case "get":
+				get(command[1]);
+				break;
 
-				case "delete":
-					delete(command[1]);
-					break;
+			case "delete":
+				delete(command[1]);
+				break;
 
-				case "expire":
-					expire(command[1], Integer.parseInt(command[2]));
-					break;
+			case "expire":
+				expire(command[1], Integer.parseInt(command[2]));
+				break;
 
-				case "flush":
-					flush();
-					break;
+			case "flush":
+				flush();
+				break;
 
-				default:
-					error++;
-					errorMessages.add(String.format("Input line %s is malformed", line));
-					LOG.error("Input line {} is malformed", line);
-				}
-
-			} catch (Exception ex) {
+			default:
 				error++;
-				errorMessages.add(String.format("Unable to execute line %s => %s", line, ex.getMessage()));
-				LOG.error("Unable to execute line {} => {}", line, ex.getMessage(), ex);
+				errorMessages.add(String.format("Input line %s is malformed", line));
+				LOG.error("Input line {} is malformed", line);
 			}
 
 			total++;

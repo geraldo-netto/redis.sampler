@@ -20,10 +20,14 @@ public class RedisJavaSampler extends AbstractJavaSamplerClient implements Inter
 	private static final String INPUT_FILE = "Input File";
 	private static final Logger LOG = LoggerFactory.getLogger(RedisJavaSampler.class);
 
-	private String host = "localhost";
-	private int port = 6379;
-	private File inputFile = new File(System.getProperty("user.home") + File.separator);
-	private RedisMediator redisMediator = null;
+	private volatile String host = "localhost";
+	private volatile int port = 6379;
+	private volatile File inputFile = new File(System.getProperty("user.home") + File.separator);
+	private volatile RedisMediator redisMediator = null;
+
+	// https://stackoverflow.com/questions/106179/regular-expression-to-match-dns-hostname-or-ip-address
+	private static final String PATTERN_IP = "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$";
+	private static final String PATTERN_HOSTNAME = "^(([a-zA-Z]|[a-zA-Z][a-zA-Z0-9-]*[a-zA-Z0-9]).)*([A-Za-z]|[A-Za-z][A-Za-z0-9-]*[A-Za-z0-9])$";
 
 	@Override
 	public Arguments getDefaultParameters() {
@@ -36,18 +40,14 @@ public class RedisJavaSampler extends AbstractJavaSamplerClient implements Inter
 
 	@Override
 	public void setupTest(JavaSamplerContext context) {
-		setupValues(context);
-	}
-
-	private void setupValues(JavaSamplerContext context) {
 		host = context.getParameter(HOST);
-		if (host == null || host.trim().isEmpty()) {
-			throw new IllegalArgumentException("Host cannot be empty");
+		if (host == null || host.trim().isEmpty() && (!host.matches(PATTERN_IP) || !host.matches(PATTERN_HOSTNAME))) {
+			throw new IllegalArgumentException("Host cannot be empty, default: localhost");
 		}
 
 		port = Integer.parseInt(context.getParameter(PORT));
-		if (port < 1 || port > 65535) {
-			throw new IllegalArgumentException("Port value must be between 1 and 65535");
+		if (0 > port && port > 65535) {
+			throw new IllegalArgumentException("Port value must be between 1 and 65535, default: 11211");
 		}
 
 		inputFile = new File(context.getParameter(INPUT_FILE));
@@ -56,34 +56,27 @@ public class RedisJavaSampler extends AbstractJavaSamplerClient implements Inter
 					String.format("%s does not exist or is not a file", inputFile.toString()));
 		}
 
-		try {
-			redisMediator = new RedisMediator(host, port);
-
-		} catch (Exception ex) {
-			LOG.error(ex.getMessage(), ex);
-		}
+		redisMediator = new RedisMediator(host, port);
+		LOG.info("Redis Mediator: {}", redisMediator);
 	}
 
 	@SuppressWarnings("unchecked")
 	public SampleResult runTest(JavaSamplerContext context) {
 		Map<String, Object> output = null;
-
 		SampleResult results = new SampleResult();
 		results.setSampleLabel("Redis");
 		results.setContentType(System.getProperty("file.encoding"));
 		results.setDataType(SampleResult.TEXT);
 
 		try {
-			if (redisMediator == null) {
-				throw new IOException("Unable to instantiate Redis client, aborting");
-			}
-
 			results.sampleStart();
 			List<String> lines = redisMediator.getFileContent(inputFile);
-			results.setSamplerData(lines.toString());
 			output = redisMediator.parse(lines);
-			results.setResponseData(output.toString(), System.getProperty("file.encoding"));
-
+			String bodyContent = lines.toString().replace("[", "").replace("]", "").replaceAll(", ", "\n");
+			results.setBodySize((long) bodyContent.getBytes().length);
+			results.setSamplerData(bodyContent);
+			results.setResponseData(output.toString().replace("{", "").replace("}", "").replaceAll(", ", "\n"),
+					System.getProperty("file.encoding"));
 			results.setResponseMessage(output.toString());
 			results.setResponseCode("200");
 			results.setResponseOK();
@@ -116,6 +109,8 @@ public class RedisJavaSampler extends AbstractJavaSamplerClient implements Inter
 
 				} catch (Exception ex) {
 					LOG.error("Closing connection the hard way...", ex);
+
+				} finally {
 					redisMediator = null;
 				}
 			}
@@ -125,15 +120,21 @@ public class RedisJavaSampler extends AbstractJavaSamplerClient implements Inter
 	}
 
 	public boolean interrupt() {
-		if (redisMediator == null) {
-			LOG.info("Nothing to interrupt, Redis Mediator is down");
-		} else {
-			LOG.info("Trying to close connection with Redis");
-			redisMediator.close();
-			redisMediator = null;
+		if (redisMediator != null) {
+			try {
+				LOG.info("Trying to close connection with Redis");
+				redisMediator.close();
+
+			} catch (IOException ioEx) {
+				LOG.error("Unable to shutdown Redis Mediator", ioEx);
+
+			} finally {
+				LOG.info("Forcing Redis Mediator to null");
+				redisMediator = null;
+			}
 		}
 
-		return (redisMediator == null);
+		return (redisMediator != null);
 	}
 
 }
