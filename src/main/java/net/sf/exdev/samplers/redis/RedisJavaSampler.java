@@ -2,7 +2,6 @@ package net.sf.exdev.samplers.redis;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.Serializable;
 import java.util.List;
 import java.util.Map;
 
@@ -14,14 +13,13 @@ import org.apache.jmeter.samplers.SampleResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class RedisJavaSampler extends AbstractJavaSamplerClient implements Serializable, Interruptible {
+public class RedisJavaSampler extends AbstractJavaSamplerClient implements Interruptible {
 
 	private static final Logger LOG = LoggerFactory.getLogger(RedisJavaSampler.class);
-	private static final long serialVersionUID = 1L;
 
 	private static final String HOST = "Host";
 	private static final String PORT = "Port";
-	private static final String INPUT_FILE = "Source File";
+	private static final String INPUT_FILE = "Input File";
 
 	private String host = "localhost";
 	private int port = 6379;
