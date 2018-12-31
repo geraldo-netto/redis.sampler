@@ -1,4 +1,4 @@
-package net.sf.exdev.redis.sampler;
+package net.sf.exdev.samplers.redis;
 
 import java.io.BufferedReader;
 import java.io.File;
