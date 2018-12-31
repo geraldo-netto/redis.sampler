@@ -15,15 +15,14 @@ import org.slf4j.LoggerFactory;
 
 public class RedisJavaSampler extends AbstractJavaSamplerClient implements Interruptible {
 
-	private static final Logger LOG = LoggerFactory.getLogger(RedisJavaSampler.class);
-
 	private static final String HOST = "Host";
 	private static final String PORT = "Port";
 	private static final String INPUT_FILE = "Input File";
+	private static final Logger LOG = LoggerFactory.getLogger(RedisJavaSampler.class);
 
 	private String host = "localhost";
 	private int port = 6379;
-	private File inputFile = new File(System.getProperty("user.home"));
+	private File inputFile = new File(System.getProperty("user.home") + File.separator);
 	private RedisMediator redisMediator = null;
 
 	@Override
@@ -58,10 +57,10 @@ public class RedisJavaSampler extends AbstractJavaSamplerClient implements Inter
 		}
 
 		try {
-			redisMediator = new RedisMediator(host, port, inputFile);
+			redisMediator = new RedisMediator(host, port);
 
-		} catch (Exception ioEx) {
-			LOG.error(ioEx.getMessage());
+		} catch (Exception ex) {
+			LOG.error(ex.getMessage(), ex);
 		}
 	}
 
@@ -86,12 +85,14 @@ public class RedisJavaSampler extends AbstractJavaSamplerClient implements Inter
 			results.setResponseData(output.toString(), System.getProperty("file.encoding"));
 
 			results.setResponseMessage(output.toString());
+			results.setResponseCode("200");
 			results.setResponseOK();
 			results.setResponseMessageOK();
 			results.setResponseCodeOK();
 			results.setSuccessful(true);
 
 		} catch (Exception ex) {
+			results.setResponseCode("500");
 			LOG.error(ex.getMessage(), ex);
 
 			if (output != null) {
@@ -124,7 +125,15 @@ public class RedisJavaSampler extends AbstractJavaSamplerClient implements Inter
 	}
 
 	public boolean interrupt() {
-		return false;
+		if (redisMediator == null) {
+			LOG.info("Nothing to interrupt, Redis Mediator is down");
+		} else {
+			LOG.info("Trying to close connection with Redis");
+			redisMediator.close();
+			redisMediator = null;
+		}
+
+		return (redisMediator == null);
 	}
 
 }

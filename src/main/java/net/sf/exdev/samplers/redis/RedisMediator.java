@@ -19,9 +19,9 @@ public class RedisMediator {
 	private Jedis client = null;
 	private static final Logger LOG = LoggerFactory.getLogger(RedisMediator.class);
 
-	public RedisMediator(String host, int port, File file) {
+	public RedisMediator(String host, int port) {
 		client = new Jedis(host, port);
-		LOG.info("Redis configured: {}:{}  inputfile: {}", host, port, file);
+		LOG.info("Redis configured: {}:{}", host, port);
 	}
 
 	public long append(String key, String value) {
